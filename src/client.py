@@ -22,11 +22,16 @@ def run():
         
         while True:
             # Le pedimos al usuario que escriba un término a buscar en la consola
-            descriptor = input("\nIngrese la palabra clave o descriptor a buscar: ")
+            descriptor = input("\nIngrese la palabra clave o descriptor a buscar (mínimo 3 caracteres): ")
             
             if descriptor.strip().lower() in ['salir', 'exit', 'quit']:
                 print("Cerrando cliente de prueba...")
                 break
+                
+            if len(descriptor.strip()) < 3:
+                print("⚠️ Error: Por favor, ingresa al menos 3 caracteres para que la búsqueda sea efectiva.")
+                print('\n\n\n')
+                continue
                 
             try:
                 # Instanciamos la petición con el descriptor ingresado
@@ -43,6 +48,7 @@ def run():
                 
                 if not response.news:
                     print("No se encontraron noticias que coincidan con ese descriptor.")
+                    print('\n\n\n')
                 else:
                     for idx, item in enumerate(response.news, 1):
                         print(f"\n[{idx}] Título: {item.title}")
@@ -50,6 +56,8 @@ def run():
                         print(f"    Fecha de creación: {item.created_at}")
                         print(f"    Contenido: {item.content}")
                         print("-" * 46)
+
+                    print('\n==================================================================================\n\n\n')
                 
             except grpc.RpcError as e:
                 # Captura excepciones específicas enviadas desde el Servidor gRPC

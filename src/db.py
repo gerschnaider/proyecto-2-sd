@@ -26,21 +26,20 @@ def search_news_by_descriptor(descriptor: str):
         # en lugar de tuplas, lo cual facilita mapear los datos a gRPC
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Consulta SQL parametrizada con %s
-            # Hacemos un JOIN con la tabla areas para poder buscar también por el nombre de la categoría
+            # Hacemos un JOIN con la tabla areas para poder buscar también por el nombre de la categoría.
+            # Usamos Full-Text Search de PostgreSQL (to_tsvector y plainto_tsquery) en idioma español.
             query = """
                 SELECT n.news_id, n.title, n.user_id, n.category_id, n.content, n.created_at
                 FROM news n
                 LEFT JOIN areas a ON n.category_id = a.category_id
-                WHERE n.title ILIKE %s OR n.content ILIKE %s OR a.name ILIKE %s
+                WHERE to_tsvector('spanish', n.title || ' ' || n.content || ' ' || COALESCE(a.name, '')) 
+                      @@ plainto_tsquery('spanish', %s)
                 ORDER BY n.created_at DESC;
             """
             
-            # Preparamos el patrón de búsqueda (ej. "%deportes%")
-            search_pattern = f"%{descriptor}%"
-            
-            # Ejecutamos pasando los parámetros en una tupla (tres veces porque hay tres %s)
-            # Psycopg2 se encarga de escapar y sanitizar los inputs de forma segura.
-            cur.execute(query, (search_pattern, search_pattern, search_pattern))
+            # Ejecutamos pasando el descriptor en crudo.
+            # plainto_tsquery se encarga de tokenizar y buscar las palabras de forma inteligente.
+            cur.execute(query, (descriptor.strip(),))
             
             # Traemos todas las filas coincidentes
             rows = cur.fetchall()
