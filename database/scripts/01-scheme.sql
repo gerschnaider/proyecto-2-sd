@@ -7,7 +7,7 @@ CREATE TABLE users (
 -- 2. Areas / Categories Table
 CREATE TABLE areas (
     category_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) UNIQUE NOT NULL,
     user_id INT NOT NULL, 
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
