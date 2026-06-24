@@ -1,0 +1,17 @@
+services:
+  find-news-period:
+    build: .
+    environment:
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+    ports:
+      - "8010:8000"
+    networks:
+      - consorcio-red
+  
+networks:
+  consorcio-red:
+    external: true

@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  servicio_noticias:
+    build: .
+    ports:
+      - "50051:50051"
+    environment:
+      - PYTHONUNBUFFERED=1

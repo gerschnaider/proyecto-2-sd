@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  area-manager:
+    build: .
+    image: area-manager:1.0
+    container_name: area-manager-service
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=${DB_HOST:-database}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-postgres}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+    networks:
+      - consorcio-red
+
+networks:
+  consorcio-red:
+    external: true
