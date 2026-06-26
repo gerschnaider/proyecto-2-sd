@@ -146,6 +146,33 @@ services:
             - consorcio_net
 
     # -----------------------------------------------------
+    # SERVICIO 6: Last News 24 Hour
+    # -----------------------------------------------------
+    last_news_24_hour:
+        build:
+            context: ./last-news-24-hour
+        image: consorcio_last_news_24_hour:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+            FIND_NEWS_PERIOD_URL: http://find_news_period:8000/api/news-period
+        ports:
+            - "8005:8000"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+            - find_news_period
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
     # SERVICIO 7: Find News By Descriptor
     # -----------------------------------------------------
     find_news_by_descriptor:
