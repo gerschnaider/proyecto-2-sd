@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from protos import news_search_pb2
 from protos import news_search_pb2_grpc
-from src.db import search_news_by_descriptor
+from db import search_news_by_descriptor
 
 class NewsSearchServicer(news_search_pb2_grpc.NewsSearchServiceServicer):
     """
