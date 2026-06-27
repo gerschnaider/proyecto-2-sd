@@ -2,7 +2,7 @@
 #!/bin/bash
 
 # Podés cambiar el puerto a 8081 o 8082 si querés probar el balanceo de réplicas
-API_URL="http://localhost:8080/areas"
+API_URL="http://localhost:8081/areas"
 
 echo "================================================="
 echo "   INICIANDO TEST DEL MICROSERVICIO DE ÁREAS     "

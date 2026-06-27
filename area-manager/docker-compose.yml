@@ -1,21 +1,29 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15
+    container_name: area-manager-db-local
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secreta
+      POSTGRES_DB: sistema_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../database/scripts:/docker-entrypoint-initdb.d
+
   area-manager:
     build: .
     image: area-manager:1.0
-    container_name: area-manager-service
+    container_name: area-manager-service-local
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
-      - DB_HOST=${DB_HOST:-database}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_NAME=${DB_NAME:-postgres}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-    networks:
-      - consorcio-red
-
-networks:
-  consorcio-red:
-    external: true
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=sistema_db
+      - DB_USER=admin
+      - DB_PASSWORD=secreta
+    depends_on:
+      - db
