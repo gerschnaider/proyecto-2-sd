@@ -1,12 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import psycopg2
+import grpc
 import uvicorn
+
 import os
 import pika
-import json
 
-app = FastAPI(title="Microservicio de Recepción", description="API Gateway para clientes que cargan noticias", version="1.0")
+app = FastAPI(title="Microservicio de Recepción", description="API Gateway para periodistas")
 
 class NuevaNoticia(BaseModel):
     titulo: str
@@ -28,22 +29,6 @@ def recibir_noticia(noticia: NuevaNoticia):
         )
         cursor = conexion.cursor()
 
-        consulta_area = "SELECT is_deleted FROM areas WHERE category_id = %s;"
-        cursor.execute(consulta_area, (noticia.id_categoria,))
-        resultado_area = cursor.fetchone()
-
-        # Si el área no existe en la tabla 'areas'
-        if not resultado_area:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=404, detail="El área especificada no existe.")
-
-        # Si el área existe, pero está borrada lógicamente (is_deleted == True)
-        if resultado_area[0] is True:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=400, detail="El área está inactiva o eliminada. No se pueden publicar noticias aquí.")
-
         consulta_sql = """
             INSERT INTO news (title, user_id, category_id, content)
             VALUES (%s, %s, %s, %s)
@@ -59,6 +44,7 @@ def recibir_noticia(noticia: NuevaNoticia):
         
         print(f"[ÉXITO DB] Noticia guardada en la base de datos con ID: {nuevo_id}")
         
+        import json
         print("Avisando al servicio de distribución de noticias vía RabbitMQ...")
         try:
             rabbitmq_host = os.environ.get("RABBITMQ_HOST", "rabbitmq")
@@ -92,9 +78,6 @@ def recibir_noticia(noticia: NuevaNoticia):
             "id_generado": nuevo_id
         }
 
-    # Atrapamos los errores de FastAPI generados arriba (404 o 400) para no taparlos con un 500
-    except HTTPException:
-        raise
     except Exception as e:
         print(f"[ERROR GENERAL] {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
