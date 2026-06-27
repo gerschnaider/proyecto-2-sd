@@ -67,12 +67,12 @@ A continuación, se detalla la funcionalidad, estructura y cómo desplegar cada 
   docker compose -f new_subscriptions/docker-compose.yml up -d --build
   ```
 
-### 8. Envío de Noticias (`servicio_envio_noticias`)
-- **Funcionalidad:** Servicio de mensajería Pub/Sub gRPC (Python) que permite a los clientes suscribirse a una sección para recibir noticias en tiempo real (streaming asíncrono) y publicar nuevas noticias.
-- **Estructura:** Servidor gRPC en `server.py`, contrato protobuf definido en `noticias.proto`, dependencias en `requirements.txt` y `Dockerfile` (que compila automáticamente los archivos proto al construirse).
-- **Despliegue:** (Expone el puerto `50052` mapeado al puerto gRPC `50051` interno):
+### 8. Envío de Noticias (`send-news`)
+- **Funcionalidad:** Servicio de mensajería Pub/Sub WebSocket (Python) que permite a los clientes suscribirse a una sección para recibir noticias en tiempo real (streaming asíncrono).
+- **Estructura:** Servidor WebSocket en `server.py`, cliente de suscripción en `client_suscriptor.py`, dependencias en `requirements.txt` y `Dockerfile`.
+- **Despliegue:** (Expone el puerto `8765` para conexiones WebSocket):
   ```bash
-  docker compose -f servicio_envio_noticias/docker-compose.yml up -d --build
+  docker compose -f send-news/docker-compose.yml up -d --build
   ```
 
 ---

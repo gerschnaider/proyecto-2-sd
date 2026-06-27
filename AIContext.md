@@ -13,7 +13,7 @@ Actualmente el proyecto cuenta con múltiples microservicios desacoplados: búsq
   - `get-news-load-by-area/`: API REST (Python) en puerto 8020 para estadísticas de volumen de noticias.
   - `delete-news/`: API REST (Python) en puerto 8000 para eliminación de noticias asegurando autoría del creador.
   - `new_subscriptions/`: API REST (Python) en puerto 8030 para gestionar suscripciones de usuarios a áreas temáticas.
-  - `servicio_envio_noticias/`: Servicio de mensajería Pub/Sub gRPC (Python) en puerto 50052/50051 para suscripción asíncrona (streaming) y publicación.
+  - `send-news/`: Servicio de mensajería Pub/Sub WebSocket (Python) en puerto 8765 para suscripción asíncrona (streaming).
 - **Red Compartida:** Docker bridge `consorcio-red` para la intercomunicación de servicios.
 - **Documentación de Arquitectura:** Directorio `graphify-out/` generado dinámicamente con `graphify`.
 
