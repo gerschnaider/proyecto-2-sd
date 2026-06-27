@@ -4,9 +4,14 @@ services:
   servicio_noticias:
     build: .
     ports:
-      - "50052:50051" # Map to port 50052 on host to avoid conflict with find-news-by-descriptor on 50051
+      - "8765:8765" # Puerto WebSocket
     environment:
       - PYTHONUNBUFFERED=1
+      - DB_HOST=db
+      - DB_NAME=noticias_db
+      - DB_USER=postgres
+      - DB_PASS=admin
+      - RABBITMQ_HOST=rabbitmq
     networks:
       - consorcio-red
 

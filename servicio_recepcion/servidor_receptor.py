@@ -44,6 +44,7 @@ def recibir_noticia(noticia: NuevaNoticia):
         
         print(f"[ÉXITO DB] Noticia guardada en la base de datos con ID: {nuevo_id}")
         
+        import json
         print("Avisando al servicio de distribución de noticias vía RabbitMQ...")
         try:
             rabbitmq_host = os.environ.get("RABBITMQ_HOST", "rabbitmq")
@@ -52,11 +53,19 @@ def recibir_noticia(noticia: NuevaNoticia):
             
             channel.exchange_declare(exchange='noticias_exchange', exchange_type='fanout')
             
-            # Solo enviamos el ID de la noticia, como acordamos
-            mensaje = str(nuevo_id)
+            # Armamos el payload completo con los datos de la noticia
+            mensaje_dict = {
+                "news_id": nuevo_id,
+                "titulo": noticia.titulo,
+                "id_autor": noticia.id_autor,
+                "id_categoria": noticia.id_categoria,
+                "texto": noticia.texto
+            }
+            mensaje = json.dumps(mensaje_dict)
+            
             channel.basic_publish(exchange='noticias_exchange', routing_key='', body=mensaje)
             
-            print(f"[ÉXITO DISTRIBUCIÓN] Noticia ID {nuevo_id} publicada en RabbitMQ")
+            print(f"[ÉXITO DISTRIBUCIÓN] Noticia ID {nuevo_id} (JSON) publicada en RabbitMQ")
             connection.close()
                 
         except Exception as error_distribucion:

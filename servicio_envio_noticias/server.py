@@ -1,126 +1,145 @@
-import grpc
-from concurrent import futures
-import time
+import asyncio
+import websockets
+import json
 import logging
-import queue
-import threading
 import os
-import pika
 import psycopg2
+import aio_pika
 
-import noticias_pb2
-# pyrefly: ignore [missing-import]
-import noticias_pb2_grpc
+logging.basicConfig(level=logging.INFO)
 
-class ServicioNoticiasServicer(noticias_pb2_grpc.ServicioNoticiasServicer):
-    def __init__(self):
-        # Diccionario para mapear: seccion -> lista_de_colas_de_clientes
-        # Cada cliente conectado tendrá una cola donde se depositan las noticias a enviar
-        self.suscriptores = {}  #acá guardo por ejemplo {1: [cola_juan, cola_pedro], 2: [cola_maria]}
-        self.lock = threading.Lock() #por si dos personas intentan suscribirse al mismo ms
+# Configuración de entorno
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "noticias_db")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASS = os.getenv("DB_PASS", "postgrespassword")
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
 
-    def SuscribirASeccion(self, request, context):
-        id_categoria = request.id_categoria
-        cliente_id = request.cliente_id
-        logging.info(f"Cliente {cliente_id} suscrito a la categoría ID: {id_categoria}")
+# Diccionario global para websockets
+# Formato: { category_id: set(websocket1, websocket2, ...) }
+suscriptores = {}
 
-        # Crear una cola para este cliente
-        q = queue.Queue()
+def get_db_connection():
+    return psycopg2.connect(
+        host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS
+    )
 
-        with self.lock:
-            if id_categoria not in self.suscriptores:
-                self.suscriptores[id_categoria] = []
-            self.suscriptores[id_categoria].append(q)
+def verificar_suscripcion_db(user_id, category_id):
+    """Consulta bloqueante a la Base de Datos. Verifica si el usuario está suscripto."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM subscriptions WHERE user_id = %s AND category_id = %s;",
+            (user_id, category_id)
+        )
+        existe = cur.fetchone() is not None
+        cur.close()
+        conn.close()
+        return existe
+    except Exception as e:
+        logging.error(f"Error verificando suscripción en BD: {e}")
+        return False
 
+async def websocket_handler(websocket):
+    """Maneja las conexiones entrantes de los clientes."""
+    try:
+        # 1. Esperamos el mensaje de autenticación/suscripción
+        mensaje = await websocket.recv()
+        datos = json.loads(mensaje)
+        user_id = datos.get("user_id")
+        category_id = datos.get("category_id")
+        
+        if not user_id or not category_id:
+            await websocket.send(json.dumps({"error": "Faltan user_id o category_id"}))
+            return
+            
+        # 2. Verificar en PostgreSQL si el usuario tiene permiso (de forma asíncrona)
+        esta_suscripto = await asyncio.to_thread(verificar_suscripcion_db, user_id, category_id)
+        
+        if not esta_suscripto:
+            logging.warning(f"Usuario {user_id} intentó escuchar categoría {category_id} sin permiso en la BD.")
+            await websocket.send(json.dumps({"error": "No estás suscripto a esta categoría en la Base de Datos."}))
+            return
+            
+        # 3. Registrar el websocket en memoria local
+        if category_id not in suscriptores:
+            suscriptores[category_id] = set()
+        suscriptores[category_id].add(websocket)
+        logging.info(f"Usuario {user_id} validado y conectado a la categoría {category_id}")
+        
+        await websocket.send(json.dumps({"mensaje": f"Conectado a la categoría {category_id} con éxito. Esperando noticias..."}))
+        
+        # 4. Mantener viva la conexión
+        async for _ in websocket:
+            pass 
+            
+    except websockets.exceptions.ConnectionClosed:
+        pass
+    except Exception as e:
+        logging.error(f"Error inesperado en WS: {e}")
+    finally:
+        # Limpieza
+        for cat, wss in list(suscriptores.items()):
+            if websocket in wss:
+                wss.remove(websocket)
+
+async def procesar_mensaje_rabbitmq(message: aio_pika.abc.AbstractIncomingMessage):
+    """Se ejecuta cada vez que Sabrina tira un JSON en RabbitMQ."""
+    async with message.process():
+        cuerpo = message.body.decode()
+        logging.info(f"JSON recibido de RabbitMQ: {cuerpo}")
+        
         try:
-            # Mantener la conexión abierta y enviar noticias a medida que lleguen
-            while context.is_active():
+            noticia = json.loads(cuerpo)
+            category_id = noticia.get("id_categoria")
+        except json.JSONDecodeError:
+            logging.error("El mensaje de RabbitMQ no es un JSON válido.")
+            return
+
+        if not category_id:
+            logging.error("El JSON de la noticia no tiene 'id_categoria'.")
+            return
+        
+        # Enrutamiento Inteligente (Sin tocar la BD):
+        # Repartir a los WebSockets conectados que pidieron esta categoría
+        if category_id in suscriptores and suscriptores[category_id]:
+            mensaje_json = json.dumps(noticia)
+            for ws in suscriptores[category_id]:
                 try:
-                    # Esperar por una noticia (timeout para poder chequear si el contexto sigue activo)
-                    noticia = q.get(timeout=1)
-                    yield noticia
-                except queue.Empty:
-                    continue
-        except Exception as e:
-            logging.error(f"Error con el cliente {cliente_id}: {e}")
-        finally:
-            # Cuando el cliente se desconecta, lo removemos de la lista
-            with self.lock:
-                if id_categoria in self.suscriptores and q in self.suscriptores[id_categoria]:
-                    self.suscriptores[id_categoria].remove(q)
-            logging.info(f"Cliente {cliente_id} desconectado de la categoría ID: {id_categoria}")
-
-
-
-def rabbitmq_consumer(servicer):
-    rabbitmq_host = os.environ.get("RABBITMQ_HOST", "rabbitmq")
-    while True:
-        try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host))
-            channel = connection.channel()
-            channel.exchange_declare(exchange='noticias_exchange', exchange_type='fanout')
-            
-            result = channel.queue_declare(queue='', exclusive=True)
-            queue_name = result.method.queue
-            
-            channel.queue_bind(exchange='noticias_exchange', queue=queue_name)
-            
-            def callback(ch, method, properties, body):
-                id_noticia = int(body.decode())
-                logging.info(f"Recibido ID de noticia desde RabbitMQ: {id_noticia}")
-                
-                try:
-                    conn = psycopg2.connect(
-                        host=os.getenv("DB_HOST", "db"),
-                        port=os.getenv("DB_PORT", "5432"),
-                        user=os.getenv("DB_USER", "admin"),
-                        password=os.getenv("DB_PASSWORD", "secreta"),
-                        dbname=os.getenv("DB_NAME", "sistema_db")
-                    )
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT title, user_id, category_id, content, created_at FROM news WHERE news_id = %s", (id_noticia,))
-                    row = cursor.fetchone()
-                    
-                    if row:
-                        titulo, id_autor, id_categoria, texto, fecha = row
-                        with servicer.lock:
-                            if id_categoria in servicer.suscriptores:
-                                noti = noticias_pb2.Noticia(
-                                    id_noticia=id_noticia,
-                                    titulo=titulo,
-                                    id_autor=id_autor,
-                                    id_categoria=id_categoria,
-                                    texto=texto,
-                                    fecha=str(fecha)
-                                )
-                                for q in servicer.suscriptores[id_categoria]:
-                                    q.put(noti)
-                    cursor.close()
-                    conn.close()
+                    await ws.send(mensaje_json)
                 except Exception as e:
-                    logging.error(f"Error consultando BD o enviando a clientes: {e}")
+                    logging.error(f"Error enviando JSON al WS del cliente: {e}")
 
-            channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
-            logging.info("RabbitMQ Consumer esperando mensajes en background...")
-            channel.start_consuming()
-            
-        except Exception as e:
-            logging.error(f"Error en RabbitMQ (reintentando en 5s): {e}")
-            time.sleep(5)
+async def rabbitmq_listener():
+    """Conecta a RabbitMQ y se suscribe al canal global de Sabri."""
+    await asyncio.sleep(5) 
+    try:
+        connection = await aio_pika.connect_robust(f"amqp://guest:guest@{RABBITMQ_HOST}/")
+        channel = await connection.channel()
+        
+        # Mismo exchange 'fanout' que usa Sabrina
+        exchange = await channel.declare_exchange('noticias_exchange', aio_pika.ExchangeType.FANOUT)
+        
+        # Cola exclusiva de esta réplica
+        queue = await channel.declare_queue('', exclusive=True)
+        await queue.bind(exchange)
+        
+        logging.info(f"Conectado a RabbitMQ en {RABBITMQ_HOST}. Escuchando noticias en vivo...")
+        
+        await queue.consume(procesar_mensaje_rabbitmq)
+        await asyncio.Future() 
+    except Exception as e:
+        logging.error(f"Error fatal conectando a RabbitMQ: {e}")
 
-def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    servicer = ServicioNoticiasServicer()
+async def main():
+    logging.info("Iniciando servicio de distribución de noticias (Optimizadísimo)...")
+    ws_server = websockets.serve(websocket_handler, "0.0.0.0", 8765)
     
-    # Iniciar hilo de RabbitMQ
-    threading.Thread(target=rabbitmq_consumer, args=(servicer,), daemon=True).start()
-    
-    noticias_pb2_grpc.add_ServicioNoticiasServicer_to_server(servicer, server)
-    server.add_insecure_port('[::]:50051')
-    server.start()
-    logging.info("Servicio de Noticias (Suscripciones via gRPC) escuchando en el puerto 50051...")
-    server.wait_for_termination()
+    await asyncio.gather(
+        ws_server,
+        rabbitmq_listener()
+    )
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    serve()
+if __name__ == "__main__":
+    asyncio.run(main())
