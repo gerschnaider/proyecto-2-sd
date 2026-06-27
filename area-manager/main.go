@@ -90,13 +90,13 @@ func deleteAreaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Buscamos en la BD el user_id del dueño 
-	var ownerID int
-	querySelect := `SELECT user_id FROM areas WHERE name = $1`
-	err := db.QueryRow(querySelect, areaName).Scan(&ownerID)
+	// Buscamos en la BD el user_id del dueño y el category_id
+	var ownerID, categoryID int
+	querySelect := `SELECT category_id, user_id FROM areas WHERE name = $1 AND is_deleted = false`
+	err := db.QueryRow(querySelect, areaName).Scan(&categoryID, &ownerID)
 	
 	if err == sql.ErrNoRows {
-		// El área no existe
+		// El área no existe o ya fue borrada
 		http.Error(w, "Área no encontrada", http.StatusNotFound) // HTTP 404
 		return
 	} else if err != nil {
@@ -112,11 +112,38 @@ func deleteAreaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Si pasamos todas las validaciones, ejecutamos el DELETE
-	queryDelete := `DELETE FROM areas WHERE name = $1`
-	_, err = db.Exec(queryDelete, areaName)
+	// 5. Ejecutamos el borrado lógico usando una transacción
+	tx, err := db.Begin()
 	if err != nil {
+		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
+		log.Printf("Error db.Begin: %v", err)
+		return
+	}
+
+	// 5.1 Borrado lógico del área
+	queryUpdateArea := `UPDATE areas SET is_deleted = true WHERE category_id = $1`
+	_, err = tx.Exec(queryUpdateArea, categoryID)
+	if err != nil {
+		tx.Rollback()
 		http.Error(w, "Error al intentar borrar el área", http.StatusInternalServerError)
+		log.Printf("Error al borrar área: %v", err)
+		return
+	}
+
+	// 5.2 Borrado lógico de las noticias asociadas
+	queryUpdateNews := `UPDATE news SET is_deleted = true WHERE category_id = $1`
+	_, err = tx.Exec(queryUpdateNews, categoryID)
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Error al intentar borrar las noticias del área", http.StatusInternalServerError)
+		log.Printf("Error al borrar noticias: %v", err)
+		return
+	}
+
+	// 5.3 Confirmar la transacción
+	if err = tx.Commit(); err != nil {
+		http.Error(w, "Error al procesar la operación", http.StatusInternalServerError)
+		log.Printf("Error tx.Commit: %v", err)
 		return
 	}
 
