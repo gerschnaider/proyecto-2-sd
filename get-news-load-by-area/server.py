@@ -37,6 +37,7 @@ def get_news_load():
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Query para contar las noticias agrupadas por categoría
             # Se usa LEFT JOIN para incluir áreas sin noticias
+            # Se filtran las áreas y noticias borradas lógicamente (is_deleted = FALSE)
             query = """
                 SELECT 
                     a.category_id, 
@@ -45,7 +46,9 @@ def get_news_load():
                 FROM 
                     areas a
                 LEFT JOIN 
-                    news n ON a.category_id = n.category_id
+                    news n ON a.category_id = n.category_id AND n.is_deleted = FALSE
+                WHERE 
+                    a.is_deleted = FALSE
                 GROUP BY 
                     a.category_id, a.name
                 ORDER BY 
