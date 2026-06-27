@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.errors import UniqueViolation, ForeignKeyViolation
 
 app = FastAPI(title="Servicio de Suscripciones (Directo a BD)")
 
@@ -17,10 +17,6 @@ class SuscripcionRequest(BaseModel):
     user_id: int
     category_id: int
 
-class NuevaArea(BaseModel):
-    category_id: int
-    name: str
-
 def get_db_connection():
     try:
         conn = psycopg2.connect(
@@ -32,49 +28,13 @@ def get_db_connection():
             status_code=500, detail=f"Error conectando a la BD: {str(e)}"
         )
 
-# ==========================================
-# 1. GESTIÓN DE ÁREAS (AHORA DIRECTO A LA BD)
-# ==========================================
-@app.post("/areas")
-def agregar_area(area: NuevaArea):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute(
-            "INSERT INTO areas (category_id, name) VALUES (%s, %s);",
-            (area.category_id, area.name)
-        )
-        conn.commit()
-        return {"mensaje": f"Área '{area.name}' agregada a la base de datos."}
-    except psycopg2.errors.UniqueViolation:
-        conn.rollback()
-        raise HTTPException(status_code=400, detail="El ID del área ya existe en la BD.")
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cur.close()
-        conn.close()
-
-@app.get("/areas")
-def listar_areas():
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT category_id, name FROM areas ORDER BY category_id;")
-    filas = cur.fetchall()
-    cur.close()
-    conn.close()
-    return filas
-
-# ==========================================
-# 2. GESTIÓN DE SUSCRIPCIONES
-# ==========================================
+# GESTIÓN DE SUSCRIPCIONES
 @app.post("/suscribir")
 def suscribir_cliente(suscripcion: SuscripcionRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # 1. VALIDAR SI EL ÁREA EXISTE EN LA BASE DE DATOS
+        #VALIDAR SI EL ÁREA EXISTE EN LA BASE DE DATOS
         cur.execute("SELECT name FROM areas WHERE category_id = %s;", (suscripcion.category_id,))
         area_encontrada = cur.fetchone()
         
@@ -84,17 +44,9 @@ def suscribir_cliente(suscripcion: SuscripcionRequest):
                 detail=f"El área {suscripcion.category_id} no existe en la base de datos."
             )
             
-        nombre_del_area = area_encontrada[0] # Al no usar RealDictCursor acá, es una tupla
+        nombre_del_area = area_encontrada[0] # Al usar fetchone devuelve una tupla
 
-        # 2. VERIFICAR SI EL USER_ID EXISTE (Si no, lo creamos)
-        cur.execute("SELECT user_id FROM users WHERE user_id = %s;", (suscripcion.user_id,))
-        if not cur.fetchone():
-            cur.execute(
-                "INSERT INTO users (user_id, name) VALUES (%s, %s);",
-                (suscripcion.user_id, f"Auto-generated User {suscripcion.user_id}")
-            )
-
-        # 3. INTENTAR LA SUSCRIPCIÓN
+        #INTENTAR LA SUSCRIPCIÓN
         cur.execute(
             "INSERT INTO subscriptions (user_id, category_id) VALUES (%s, %s);",
             (suscripcion.user_id, suscripcion.category_id),
@@ -106,14 +58,20 @@ def suscribir_cliente(suscripcion: SuscripcionRequest):
             "success": True
         }
         
-    except psycopg2.errors.UniqueViolation:
+    except UniqueViolation:
         conn.rollback()
         raise HTTPException(
             status_code=400, detail="El usuario ya está suscrito a esta área."
         )
+    except ForeignKeyViolation:
+        conn.rollback()
+        raise HTTPException(
+            status_code=400, detail="El usuario especificado no existe en la base de datos."
+        )
     except Exception as e:
         conn.rollback()
-        # Para que no tape el HTTPException de área no encontrada
+        
+        #para que no tape el HTTPException de área no encontrada
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
@@ -121,49 +79,74 @@ def suscribir_cliente(suscripcion: SuscripcionRequest):
         cur.close()
         conn.close()
 
+
+# ENDPOINT PARA DESUSCRIBIRSE DE UN ÁREA
 @app.delete("/desuscribir")
 def desuscribir_cliente(suscripcion: SuscripcionRequest):
     conn = get_db_connection()
     cur = conn.cursor()
+
     try:
+        #validar que exista el area en la base de datos
+        cur.execute(
+            "SELECT name FROM areas WHERE category_id = %s;",
+            (suscripcion.category_id,)
+        )
+        area_encontrada = cur.fetchone()
+
+        if not area_encontrada:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El área {suscripcion.category_id} no existe en la base de datos."
+            )
+
+        nombre_del_area = area_encontrada[0]
+
+        #validar que el usuario exista
+        cur.execute(
+            "SELECT 1 FROM users WHERE user_id = %s;",
+            (suscripcion.user_id,)
+        )
+
+        if not cur.fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="El usuario especificado no existe en la base de datos."
+            )
+
+        # intenta eliminar la suscripción
         cur.execute(
             "DELETE FROM subscriptions WHERE user_id = %s AND category_id = %s;",
             (suscripcion.user_id, suscripcion.category_id),
         )
+
         filas_afectadas = cur.rowcount
-        conn.commit()
 
         if filas_afectadas == 0:
-            raise HTTPException(status_code=404, detail="La suscripción no existe.")
+            raise HTTPException(
+                status_code=404,
+                detail="El usuario no está suscrito a esta área."
+            )
+
+        conn.commit()
 
         return {
-            "mensaje": f"Usuario {suscripcion.user_id} dado de baja del área {suscripcion.category_id}."
+            "mensaje": f"Usuario {suscripcion.user_id} dado de baja del área '{nombre_del_area}'.",
+            "success": True
         }
+
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cur.close()
-        conn.close()
 
-@app.get("/suscripciones/{user_id}")
-def obtener_suscripciones(user_id: int):
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        # MAGIA SQL: Usamos un JOIN para cruzar las tablas de suscripciones y áreas
-        query = """
-            SELECT s.category_id, a.name 
-            FROM subscriptions s
-            JOIN areas a ON s.category_id = a.category_id
-            WHERE s.user_id = %s;
-        """
-        cur.execute(query, (user_id,))
-        filas = cur.fetchall()
-        
-        return {"user_id": user_id, "suscripciones": filas}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Para que no tape los HTTPException
+        if isinstance(e, HTTPException):
+            raise e
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
+
     finally:
         cur.close()
         conn.close()
