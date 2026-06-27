@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  database:
+    build: .
+    image: db-consorcio:1.0
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    networks:
+      - consorcio-red
+
+networks:
+  consorcio-red:
+    name: consorcio-red
+    driver: bridge

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package noticias;
+
+// El servicio de Noticias gestiona el envío de las mismas a los clientes
+service ServicioNoticias {
+    // El cliente llama a este método para suscribirse y recibe un stream de noticias
+    rpc SuscribirASeccion (SuscripcionRequest) returns (stream Noticia) {}
+}
+
+message SuscripcionRequest {
+    string cliente_id = 1;
+    int32 id_categoria = 2; // ej: 1 ("Tecnología"), 2 ("Deportes"), 3 ("Cultura")
+}
+
+message Noticia {
+    int32 id_noticia = 1;
+    string titulo = 2;
+    int32 id_autor = 3;
+    int32 id_categoria = 4;
+    string texto = 5;
+    string fecha = 6;
+}

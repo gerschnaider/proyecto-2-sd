@@ -1,0 +1,279 @@
+version: '3.8'
+
+services:
+    # -----------------------------------------------------
+    # SERVICIO 1: Base de Datos PostgreSQL
+    # -----------------------------------------------------
+    db:
+        build:
+            context: ./database
+        image: consorcio_db:latest
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: secreta
+            POSTGRES_DB: sistema_db
+        ports:
+            - "5432:5432"
+        deploy:
+            placement:
+                constraints: [ node.role == manager ]
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 2: Microservicio de Áreas (Go)
+    # -----------------------------------------------------
+    area_manager:
+        build:
+            context: ./area-manager
+        image: consorcio_area_manager:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "8080:8080"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 3: Delete News
+    # -----------------------------------------------------
+    delete_news:
+        build:
+            context: ./delete-news
+        image: consorcio_delete_news:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "8001:8000"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 4: Find News Period
+    # -----------------------------------------------------
+    find_news_period:
+        build:
+            context: ./find-news-period
+        image: consorcio_find_news_period:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "8002:8000"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 5: Get News Load By Area
+    # -----------------------------------------------------
+    get_news_load_by_area:
+        build:
+            context: ./get-news-load-by-area
+        image: consorcio_get_news_load_by_area:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "8003:8000"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 6: New Subscriptions
+    # -----------------------------------------------------
+    new_subscriptions:
+        build:
+            context: ./new_subscriptions
+        image: consorcio_new_subscriptions:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "8004:8000"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 6: Last News 24 Hour
+    # -----------------------------------------------------
+    last_news_24_hour:
+        build:
+            context: ./last-news-24-hour
+        image: consorcio_last_news_24_hour:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+            FIND_NEWS_PERIOD_URL: http://find_news_period:8000/api/news-period
+        ports:
+            - "8005:8000"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+            - find_news_period
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 7: Find News By Descriptor
+    # -----------------------------------------------------
+    find_news_by_descriptor:
+        build:
+            context: ./find-news-by-descriptor
+        image: consorcio_find_news_by_descriptor:latest
+        environment:
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "50051:50051"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+            placement:
+                constraints:
+                    - node.role == manager
+        depends_on:
+            - db
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 8: Servicio Envio Noticias
+    # -----------------------------------------------------
+    servicio_envio_noticias:
+        build:
+            context: ./servicio_envio_noticias
+        image: consorcio_servicio_envio_noticias:latest
+        environment:
+            PYTHONUNBUFFERED: "1"
+            RABBITMQ_HOST: rabbitmq
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "50052:50051"
+        deploy:
+            mode: replicated
+            replicas: 2
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+            - rabbitmq
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 9: RabbitMQ (Broker)
+    # -----------------------------------------------------
+    rabbitmq:
+        image: rabbitmq:3-management
+        container_name: consorcio_rabbitmq
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        deploy:
+            placement:
+                constraints: [ node.role == manager ]
+        networks:
+            - consorcio_net
+
+    # -----------------------------------------------------
+    # SERVICIO 10: Servicio Recepción
+    # -----------------------------------------------------
+    servicio_recepcion:
+        build:
+            context: ./servicio_recepcion
+        image: consorcio_servicio_recepcion:latest
+        environment:
+            PYTHONUNBUFFERED: "1"
+            RABBITMQ_HOST: rabbitmq
+            DB_HOST: db
+            DB_USER: admin
+            DB_PASSWORD: secreta
+            DB_NAME: sistema_db
+            DB_PORT: 5432
+        ports:
+            - "50050:50050"
+        deploy:
+            mode: replicated
+            replicas: 1
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - db
+            - rabbitmq
+        networks:
+            - consorcio_net
+
+# -----------------------------------------------------
+# RED: El túnel privado entre contenedores
+# -----------------------------------------------------
+networks:
+    consorcio_net: 
+        driver: overlay
