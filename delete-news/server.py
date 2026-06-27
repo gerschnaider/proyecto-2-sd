@@ -27,8 +27,8 @@ def delete_news(news_id: int, user_id: int):
     cur = conn.cursor()
     
     try:
-        # 1. Buscar la noticia para verificar su existencia y su dueño
-        cur.execute("SELECT user_id FROM news WHERE news_id = %s;", (news_id,))
+        #Buscar la noticia para verificar su existencia y su dueño
+        cur.execute("SELECT user_id FROM news WHERE news_id = %s AND deleted = FALSE;", (news_id,))
         result = cur.fetchone()
         
         if not result:
@@ -39,15 +39,15 @@ def delete_news(news_id: int, user_id: int):
             
         owner_id = result[0]
         
-        # 2. Verificar la regla de negocio: solo el creador puede borrarla 
+        #Verificar la regla de negocio: solo el creador puede borrarla 
         if owner_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Operación denegada. Solamente el cliente que envió la noticia puede borrarla."
             )
             
-        # 3. Si pasa la validación, procedemos con el borrado seguro
-        cur.execute("DELETE FROM news WHERE news_id = %s;", (news_id,))
+        #Si pasa la verificacion, borro la noticia (marcándola como eliminada)
+        cur.execute("UPDATE news SET deleted = TRUE WHERE news_id = %s;", (news_id,))
         conn.commit()
         
         return {"status": "success", "message": f"Noticia {news_id} eliminada correctamente."}
