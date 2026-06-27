@@ -7,9 +7,8 @@ CREATE TABLE users (
 -- 2. Areas / Categories Table
 CREATE TABLE areas (
     category_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
     user_id INT NOT NULL, 
-    is_deleted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
@@ -29,7 +28,6 @@ CREATE TABLE news (
     user_id INT NOT NULL,
     category_id INT NOT NULL,
     content TEXT NOT NULL,
-    is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (category_id) REFERENCES areas(category_id)
