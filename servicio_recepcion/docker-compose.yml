@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  servicio_recepcion:
+    build: .
+    ports:
+      - "50050:50050"
+    environment:
+      - PYTHONUNBUFFERED=1
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure

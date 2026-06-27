@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package noticias;
+
+message Noticia {
+  int32 id_noticia = 1;
+  string titulo = 2;
+  int32 id_autor = 3;
+  int32 id_categoria = 4;
+  string texto = 5;
+  string fecha = 6;
+}
+
+message Respuesta {
+  bool exito = 1;
+  string mensaje = 2;
+}
+
+service ReceptorNoticias {
+  rpc EnviarNoticia (Noticia) returns (Respuesta);
+}
+
+message SuscripcionRequest {
+  string cliente_id = 1;
+  int32 id_categoria = 2;
+}
+
+message PublicacionResponse {
+  bool exito = 1;
+  string mensaje = 2;
+}
+
+service ServicioNoticias {
+  rpc SuscribirASeccion (SuscripcionRequest) returns (stream Noticia) {}
+  rpc PublicarNoticia (Noticia) returns (PublicacionResponse) {}
+}
