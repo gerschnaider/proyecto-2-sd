@@ -201,12 +201,12 @@ services:
             - consorcio_net
 
     # -----------------------------------------------------
-    # SERVICIO 8: Servicio Envio Noticias
+    # SERVICIO 8: Send News
     # -----------------------------------------------------
-    servicio_envio_noticias:
+    send_news:
         build:
-            context: ./servicio_envio_noticias
-        image: consorcio_servicio_envio_noticias:latest
+            context: ./send-news
+        image: consorcio_send_news:latest
         environment:
             PYTHONUNBUFFERED: "1"
             RABBITMQ_HOST: rabbitmq
@@ -216,7 +216,7 @@ services:
             DB_NAME: sistema_db
             DB_PORT: 5432
         ports:
-            - "50052:50051"
+            - "8765:8765"
         deploy:
             mode: replicated
             replicas: 2

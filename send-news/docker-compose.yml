@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  servicio_noticias:
+  send_news:
     build: .
     ports:
       - "8765:8765" # Puerto WebSocket
