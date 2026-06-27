@@ -44,7 +44,8 @@ def get_news_by_descriptor(descriptor: str):
                 SELECT n.news_id, n.title, n.user_id, n.category_id, n.content, n.created_at
                 FROM news n
                 LEFT JOIN areas a ON n.category_id = a.category_id
-                WHERE to_tsvector('spanish', n.title || ' ' || n.content || ' ' || COALESCE(a.name, '')) 
+                WHERE n.is_deleted = FALSE
+                      AND to_tsvector('spanish', n.title || ' ' || n.content || ' ' || COALESCE(a.name, '')) 
                       @@ plainto_tsquery('spanish', %s)
                 ORDER BY n.created_at DESC;
             """
