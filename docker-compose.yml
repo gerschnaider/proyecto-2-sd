@@ -262,7 +262,7 @@ services:
             - "50050:50050"
         deploy:
             mode: replicated
-            replicas: 1
+            replicas: 2
             restart_policy:
                 condition: on-failure
         depends_on:

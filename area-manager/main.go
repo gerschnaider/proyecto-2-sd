@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -90,63 +92,80 @@ func deleteAreaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Buscamos en la BD el user_id del dueño y el category_id
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		err := executeDeleteTransaction(r.Context(), areaName, req.UserID)
+		if err == nil {
+			// Éxito
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{"message": "Área '%s' eliminada exitosamente"}`, areaName)
+			return
+		}
+
+		// Si es un error de PostgreSQL, verificamos si es por concurrencia
+		if pqErr, ok := err.(*pq.Error); ok {
+			// 40001 = serialization_failure, 40P01 = deadlock_detected
+			if pqErr.Code == "40001" || pqErr.Code == "40P01" {
+				log.Printf("Conflicto de concurrencia detectado (intento %d/%d). Reintentando...", attempt, maxRetries)
+				time.Sleep(time.Millisecond * time.Duration(100*attempt)) // Backoff simple
+				continue
+			}
+		}
+
+		// Si es un error de negocio que nosotros definimos (ej. no encontrado, prohibido)
+		if err.Error() == "not_found" {
+			http.Error(w, "Área no encontrada", http.StatusNotFound)
+			return
+		}
+		if err.Error() == "forbidden" {
+			http.Error(w, "Prohibido: No sos el creador de esta área, no podés borrarla.", http.StatusForbidden)
+			return
+		}
+
+		// Otros errores
+		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
+		log.Printf("Error inesperado en BD: %v", err)
+		return
+	}
+
+	// Si se superaron los reintentos
+	http.Error(w, "Error al procesar la operación por alta concurrencia", http.StatusConflict)
+}
+
+func executeDeleteTransaction(ctx context.Context, areaName string, userID int) error {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	if err != nil {
+		return fmt.Errorf("error db.BeginTx: %w", err)
+	}
+	defer tx.Rollback() // Seguro de ejecutar, no hace nada si ya se hizo commit
+
 	var ownerID, categoryID int
-	querySelect := `SELECT category_id, user_id FROM areas WHERE name = $1 AND is_deleted = false`
-	err := db.QueryRow(querySelect, areaName).Scan(&categoryID, &ownerID)
+	querySelect := `SELECT category_id, user_id FROM areas WHERE name = $1 AND is_deleted = false FOR UPDATE`
+	err = tx.QueryRowContext(ctx, querySelect, areaName).Scan(&categoryID, &ownerID)
 	
 	if err == sql.ErrNoRows {
-		// El área no existe o ya fue borrada
-		http.Error(w, "Área no encontrada", http.StatusNotFound) // HTTP 404
-		return
+		return fmt.Errorf("not_found")
 	} else if err != nil {
-		// Error de conexión u otro fallo SQL
-		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
-		log.Printf("Error BD: %v", err)
-		return
+		return err
 	}
 
-	// 4. Verificamos la autorización comparando IDs
-	if ownerID != req.UserID {
-		http.Error(w, "Prohibido: No sos el creador de esta área, no podés borrarla.", http.StatusForbidden) // HTTP 403
-		return
+	if ownerID != userID {
+		return fmt.Errorf("forbidden")
 	}
 
-	// 5. Ejecutamos el borrado lógico usando una transacción
-	tx, err := db.Begin()
-	if err != nil {
-		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
-		log.Printf("Error db.Begin: %v", err)
-		return
-	}
-
-	// 5.1 Borrado lógico del área
 	queryUpdateArea := `UPDATE areas SET is_deleted = true WHERE category_id = $1`
-	_, err = tx.Exec(queryUpdateArea, categoryID)
+	_, err = tx.ExecContext(ctx, queryUpdateArea, categoryID)
 	if err != nil {
-		tx.Rollback()
-		http.Error(w, "Error al intentar borrar el área", http.StatusInternalServerError)
-		log.Printf("Error al borrar área: %v", err)
-		return
+		return err
 	}
 
-	// 5.2 Borrado lógico de las noticias asociadas
 	queryUpdateNews := `UPDATE news SET is_deleted = true WHERE category_id = $1`
-	_, err = tx.Exec(queryUpdateNews, categoryID)
+	_, err = tx.ExecContext(ctx, queryUpdateNews, categoryID)
 	if err != nil {
-		tx.Rollback()
-		http.Error(w, "Error al intentar borrar las noticias del área", http.StatusInternalServerError)
-		log.Printf("Error al borrar noticias: %v", err)
-		return
+		return err
 	}
 
-	// 5.3 Confirmar la transacción
-	if err = tx.Commit(); err != nil {
-		http.Error(w, "Error al procesar la operación", http.StatusInternalServerError)
-		log.Printf("Error tx.Commit: %v", err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"message": "Área '%s' eliminada exitosamente"}`, areaName)
+	return tx.Commit()
 }
