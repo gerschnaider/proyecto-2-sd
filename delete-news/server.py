@@ -28,7 +28,7 @@ def delete_news(news_id: int, user_id: int):
     
     try:
         #Buscar la noticia para verificar su existencia y su dueño
-        cur.execute("SELECT user_id FROM news WHERE news_id = %s AND deleted = FALSE;", (news_id,))
+        cur.execute("SELECT user_id FROM news WHERE news_id = %s AND is_deleted = FALSE;", (news_id,))
         result = cur.fetchone()
         
         if not result:
@@ -47,7 +47,7 @@ def delete_news(news_id: int, user_id: int):
             )
             
         #Si pasa la verificacion, borro la noticia (marcándola como eliminada)
-        cur.execute("UPDATE news SET deleted = TRUE WHERE news_id = %s;", (news_id,))
+        cur.execute("UPDATE news SET is_deleted = TRUE WHERE news_id = %s;", (news_id,))
         conn.commit()
         
         return {"status": "success", "message": f"Noticia {news_id} eliminada correctamente."}
