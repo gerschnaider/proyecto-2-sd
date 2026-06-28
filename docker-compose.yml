@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
     # -----------------------------------------------------
-    # SERVICIO 1: Base de Datos PostgreSQL
+    # SERVICIO 0: Base de Datos PostgreSQL
     # -----------------------------------------------------
     db:
         build:
@@ -14,6 +14,20 @@ services:
             POSTGRES_DB: sistema_db
         ports:
             - "5432:5432"
+        deploy:
+            placement:
+                constraints: [ node.role == manager ]
+        networks:
+            - consorcio_net
+    # -----------------------------------------------------
+    # SERVICIO 1: RabbitMQ (Broker)
+    # -----------------------------------------------------
+    rabbitmq:
+        image: rabbitmq:3-management
+        container_name: consorcio_rabbitmq
+        ports:
+            - "5672:5672"
+            - "15672:15672"
         deploy:
             placement:
                 constraints: [ node.role == manager ]
@@ -146,7 +160,7 @@ services:
             - consorcio_net
 
     # -----------------------------------------------------
-    # SERVICIO 6: Last News 24 Hour
+    # SERVICIO 7: Last News 24 Hour
     # -----------------------------------------------------
     last_news_24_hour:
         build:
@@ -173,7 +187,7 @@ services:
             - consorcio_net
 
     # -----------------------------------------------------
-    # SERVICIO 7: Find News By Descriptor
+    # SERVICIO 8: Find News By Descriptor
     # -----------------------------------------------------
     find_news_by_descriptor:
         build:
@@ -201,22 +215,7 @@ services:
             - consorcio_net
 
     # -----------------------------------------------------
-    # SERVICIO 9: RabbitMQ (Broker)
-    # -----------------------------------------------------
-    rabbitmq:
-        image: rabbitmq:3-management
-        container_name: consorcio_rabbitmq
-        ports:
-            - "5672:5672"
-            - "15672:15672"
-        deploy:
-            placement:
-                constraints: [ node.role == manager ]
-        networks:
-            - consorcio_net
-
-    # -----------------------------------------------------
-    # SERVICIO 8: Send News
+    # SERVICIO 9: Send News
     # -----------------------------------------------------
     send_news:
         build:
