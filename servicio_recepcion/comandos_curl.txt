@@ -1,0 +1,21 @@
+# COMANDOS CURL PARA PRUEBAS DEL SERVICIO_RECEPCION
+
+# ====================
+# WINDOWS (CMD)
+# ====================
+
+# 1. Caso de Éxito (Uso de categoría existente)
+curl -X POST http://localhost:50050/api/noticias -H "Content-Type: application/json" -d "{\"titulo\": \"Exito en Tecnologia\", \"id_autor\": 1, \"id_categoria\": 1, \"texto\": \"Carlos Solari publica en Tecnologia y UNS.\"}"
+
+# 2. Caso de Error (Categoría inexistente - Dispara 404/Error)
+curl -X POST http://localhost:50050/api/noticias -H "Content-Type: application/json" -d "{\"titulo\": \"Fallo categoria\", \"id_autor\": 1, \"id_categoria\": 99, \"texto\": \"Esta categoria no existe en la BD.\"}"
+
+# =========
+# LINUX
+# =========
+
+# 1. Caso de Éxito
+curl -X POST http://localhost:50050/api/noticias -H "Content-Type: application/json" -d '{"titulo": "Exito en Tecnologia", "id_autor": 1, "id_categoria": 1, "texto": "Carlos Solari publica en Tecnologia y UNS."}'
+
+# 2. Caso de Error
+curl -X POST http://localhost:50050/api/noticias -H "Content-Type: application/json" -d '{"titulo": "Fallo categoria", "id_autor": 1, "id_categoria": 99, "texto": "Esta categoria no existe en la BD."}'
