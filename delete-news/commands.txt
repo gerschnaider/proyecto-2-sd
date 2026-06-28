@@ -1,0 +1,1 @@
+curl -X DELETE "http://25.39.43.79:8001/noticias/<ID-NEW>?user_id=<ID-USER>"
