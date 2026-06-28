@@ -8,9 +8,9 @@ app = FastAPI(title="Servicio de Suscripciones (Directo a BD)")
 
 # Configuración de base de datos
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "noticias_db")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "postgrespassword")
+DB_NAME = os.getenv("DB_NAME", "sistema_db")
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "secreta")
 
 # --- MODELOS PYDANTIC ---
 class SuscripcionRequest(BaseModel):

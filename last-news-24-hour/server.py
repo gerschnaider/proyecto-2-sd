@@ -31,9 +31,9 @@ def get_db_connection():
         return psycopg2.connect(
             host=os.getenv("DB_HOST", "db"),
             port=os.getenv("DB_PORT", "5432"),
-            user=os.getenv("DB_USER", "user"),
-            password=os.getenv("DB_PASSWORD", "password"),
-            dbname=os.getenv("DB_NAME", "noticias_db")
+            user=os.getenv("DB_USER", "admin"),
+            password=os.getenv("DB_PASSWORD", "secreta"),
+            dbname=os.getenv("DB_NAME", "sistema_db")
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error conectando a la base de datos: {e}")

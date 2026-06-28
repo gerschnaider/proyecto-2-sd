@@ -4,13 +4,13 @@ services:
       context: ../database
       dockerfile: Dockerfile
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: noticias_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secreta
+      POSTGRES_DB: sistema_db
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d noticias_db"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d sistema_db"]
       interval: 2s
       timeout: 5s
       retries: 5
@@ -23,9 +23,9 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: user
-      DB_PASSWORD: password
-      DB_NAME: noticias_db
+      DB_USER: admin
+      DB_PASSWORD: secreta
+      DB_NAME: sistema_db
       FIND_NEWS_PERIOD_URL: http://find-news-service:8000/api/news-period
     ports:
       - "8000:8000"
