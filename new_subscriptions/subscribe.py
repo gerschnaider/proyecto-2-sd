@@ -8,9 +8,10 @@ app = FastAPI(title="Servicio de Suscripciones (Directo a BD)")
 
 # Configuración de base de datos
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "noticias_db")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "postgrespassword")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "sistema_db")
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "secreta")
 
 # --- MODELOS PYDANTIC ---
 class SuscripcionRequest(BaseModel):
@@ -20,12 +21,17 @@ class SuscripcionRequest(BaseModel):
 def get_db_connection():
     try:
         conn = psycopg2.connect(
-            host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASSWORD
+            host=DB_HOST,
+            port=DB_PORT,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
         )
         return conn
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error conectando a la BD: {str(e)}"
+            status_code=500,
+            detail=f"Error conectando a la BD: {str(e)}"
         )
 
 # GESTIÓN DE SUSCRIPCIONES
