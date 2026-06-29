@@ -8,9 +8,9 @@ services:
     environment:
       - DB_HOST=database
       - DB_PORT=5432
-      - DB_NAME=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_NAME=sistema_db
+      - DB_USER=admin
+      - DB_PASSWORD=secreta
     networks:
       - consorcio-red
 
