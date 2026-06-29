@@ -206,9 +206,6 @@ services:
             replicas: 2
             restart_policy:
                 condition: on-failure
-            placement:
-                constraints:
-                    - node.role == manager
         depends_on:
             - db
         networks:
