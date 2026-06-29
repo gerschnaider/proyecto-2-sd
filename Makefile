@@ -58,9 +58,16 @@ local-down:
 # PRUEBAS Y LIMPIEZA
 # ==========================================
 test:
-	@echo "Ejecutando batería de pruebas E2E contra: $(IP)"
-	chmod +x e2e_test.sh
-	./e2e_test.sh $(IP)
+	@if [ "$(IP)" = "localhost" ]; then \
+		read -p "Ingrese la IP del clúster Swarm (o ENTER para 'localhost'): " user_ip; \
+		IP_TO_USE=$${user_ip:-localhost}; \
+	else \
+		IP_TO_USE="$(IP)"; \
+	fi; \
+	echo "Ejecutando batería de pruebas E2E contra: $$IP_TO_USE"; \
+	chmod +x e2e_test.sh; \
+	./e2e_test.sh $$IP_TO_USE
+
 
 clean: down
 	@echo "Limpiando el sistema Docker (prune)..."
