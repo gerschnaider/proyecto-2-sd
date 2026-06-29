@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consorcio de Noticias - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Consorcio de Noticias</h1>
+            <div class="config-panel">
+                <label for="cluster-ip">IP del Swarm:</label>
+                <input type="text" id="cluster-ip" value="localhost" placeholder="Ej: 192.168.1.10">
+            </div>
+        </header>
+
+        <main>
+            <div class="cards-grid">
+                <!-- Area Manager -->
+                <div class="card">
+                    <h2>Áreas Temáticas</h2>
+                    <input type="text" id="area-name" placeholder="Nombre del Área">
+                    <input type="number" id="area-user-id" placeholder="ID Autor (ej. 1)" value="1">
+                    <div class="btn-group">
+                        <button onclick="createArea()">Crear</button>
+                        <button onclick="deleteArea()" class="danger">Eliminar</button>
+                    </div>
+                </div>
+
+                <!-- Subscriptions -->
+                <div class="card">
+                    <h2>Suscripciones</h2>
+                    <input type="number" id="sub-category-id" placeholder="ID de Categoría">
+                    <input type="number" id="sub-user-id" placeholder="ID Usuario" value="1">
+                    <div class="btn-group">
+                        <button onclick="subscribe()">Suscribirse</button>
+                        <button onclick="unsubscribe()" class="danger">Desuscribirse</button>
+                    </div>
+                </div>
+
+                <!-- Publish News -->
+                <div class="card">
+                    <h2>Publicar Noticia</h2>
+                    <input type="text" id="pub-title" placeholder="Título">
+                    <input type="number" id="pub-category-id" placeholder="ID de Categoría">
+                    <input type="number" id="pub-user-id" placeholder="ID Autor" value="1">
+                    <textarea id="pub-content" rows="3" placeholder="Contenido de la noticia..."></textarea>
+                    <button onclick="publishNews()">Publicar</button>
+                </div>
+
+                <!-- Queries -->
+                <div class="card queries-card">
+                    <h2>Consultas</h2>
+                    
+                    <div class="query-row">
+                        <button onclick="getNewsLoad()">Carga por Área</button>
+                    </div>
+
+                    <div class="query-row">
+                        <input type="text" id="q-descriptor" placeholder="Descriptor (ej. deportes)">
+                        <button onclick="findNewsByDescriptor()">Buscar Descriptor</button>
+                    </div>
+
+                    <div class="query-row">
+                        <input type="number" id="q-user-id" placeholder="ID Usuario" value="1">
+                        <button onclick="getLast24h()">Últimas 24h</button>
+                    </div>
+
+                    <div class="query-row">
+                        <input type="date" id="q-start">
+                        <input type="date" id="q-end">
+                        <button onclick="findNewsPeriod()">Por Período</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Console -->
+            <section class="console">
+                <div class="console-header">
+                    <span>Terminal de Resultados</span>
+                    <button onclick="clearConsole()" class="small">Limpiar</button>
+                </div>
+                <pre id="output-log">Esperando operaciones...</pre>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
